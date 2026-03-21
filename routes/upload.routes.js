@@ -1,5 +1,10 @@
 import express from 'express';
-import { uploadCover, uploadPages, handleUploadError } from '../middleware/upload.middleware.js';
+import {
+  uploadCover,
+  uploadPages,
+  uploadBookAssets,
+  handleUploadError,
+} from '../middleware/upload.middleware.js';
 import { uploadToCloudinary, uploadMultipleToCloudinary } from '../utils/cloudinary.js';
 import cloudinary, { getCloudinaryConfigStatus } from '../config/cloudinary.js';
 
@@ -68,6 +73,56 @@ router.post('/cover', handleUploadError(uploadCover), async (req, res) => {
       error: 'Failed to upload image to Cloudinary',
       details: error.message || 'Unknown error',
       ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
+    });
+  }
+});
+
+// Cover + logo + pages in one request (parallel Cloudinary uploads on server)
+router.post('/book-assets', handleUploadError(uploadBookAssets), async (req, res) => {
+  try {
+    const cover = req.files?.cover?.[0];
+    const logo = req.files?.logo?.[0];
+    const pageFiles = req.files?.pages || [];
+    if (!cover && !logo && pageFiles.length === 0) {
+      return res.status(400).json({ error: 'No files uploaded' });
+    }
+
+    const t = Date.now();
+    const rnd = () => Math.round(Math.random() * 1e9);
+
+    const [coverResult, logoResult, pageResults] = await Promise.all([
+      cover
+        ? uploadToCloudinary(
+            cover.buffer,
+            'social-offer/covers',
+            `cover-${t}-${rnd()}`
+          )
+        : Promise.resolve(null),
+      logo
+        ? uploadToCloudinary(
+            logo.buffer,
+            'social-offer/logos',
+            `logo-${t}-${rnd()}`
+          )
+        : Promise.resolve(null),
+      pageFiles.length > 0
+        ? uploadMultipleToCloudinary(
+            pageFiles.map((f) => f.buffer),
+            'social-offer/pages'
+          )
+        : Promise.resolve([]),
+    ]);
+
+    res.status(200).json({
+      coverUrl: coverResult ? coverResult.url : null,
+      logoUrl: logoResult ? logoResult.url : null,
+      pageUrls: pageResults.map((r) => r.url),
+    });
+  } catch (error) {
+    console.error('Cloudinary upload error:', error);
+    res.status(500).json({
+      error: 'Failed to upload images to Cloudinary',
+      details: error.message,
     });
   }
 });

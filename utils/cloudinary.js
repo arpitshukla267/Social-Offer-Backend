@@ -20,9 +20,8 @@ export const uploadToCloudinary = (fileBuffer, folder = 'social-offer', filename
           folder: folder,
           public_id: filename,
           resource_type: 'image',
-          transformation: [
-            { fetch_format: 'auto', quality: 'auto' } // Optimize images
-          ]
+          timeout: 120000,
+          // No eager transformations — faster upload; optimize via URL params when displaying if needed
         },
         (error, result) => {
           if (error) {
@@ -68,10 +67,11 @@ export const uploadToCloudinary = (fileBuffer, folder = 'social-offer', filename
  * @returns {Promise<Array<Object>>} Array of upload results
  */
 export const uploadMultipleToCloudinary = async (fileBuffers, folder = 'social-offer') => {
-  const uploadPromises = fileBuffers.map((buffer, index) => 
-    uploadToCloudinary(buffer, folder, `page-${Date.now()}-${index}`)
+  const t = Date.now();
+  const uploadPromises = fileBuffers.map((buffer, index) =>
+    uploadToCloudinary(buffer, folder, `page-${t}-${index}-${Math.random().toString(36).slice(2, 9)}`)
   );
-  
+
   return Promise.all(uploadPromises);
 };
 

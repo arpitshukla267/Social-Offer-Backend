@@ -30,6 +30,17 @@ export const uploadPages = multer({
   fileFilter: imageFilter
 }).array('pages', 50); // Allow up to 50 page images
 
+/** Single request: optional cover, logo, and/or page images (one HTTP round-trip from client) */
+export const uploadBookAssets = multer({
+  storage: memoryStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: imageFilter,
+}).fields([
+  { name: 'cover', maxCount: 1 },
+  { name: 'logo', maxCount: 1 },
+  { name: 'pages', maxCount: 50 },
+]);
+
 // Middleware wrapper for better error handling
 export const handleUploadError = (uploadMiddleware) => {
   return (req, res, next) => {
